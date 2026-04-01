@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { ActionConfirmForm } from "@/components/ActionConfirmForm";
 import { getFlashMessage } from "@/lib/flash";
 import { getAgreementStatusLabel } from "@/lib/labels";
 import { getNextAgreementNumber } from "@/lib/numbering";
@@ -68,7 +69,10 @@ async function deleteContract(formData: FormData) {
   const id = String(formData.get("id") ?? "");
   if (!id) redirect("/contracts?type=error&message=contract_delete_failed");
   try {
-    await prisma.agreement.delete({ where: { id } });
+    await prisma.agreement.update({
+      where: { id },
+      data: { status: "CLOSED" },
+    });
   } catch {
     redirect("/contracts?type=error&message=contract_delete_failed");
   }
@@ -96,6 +100,17 @@ async function updateContract(formData: FormData) {
   }
   if (new Date(startDate) > new Date(endDate) || availableRoomsRaw < 0) {
     redirect("/contracts?type=error&message=contract_update_failed");
+  }
+
+  const existingBookings = await prisma.booking.findMany({
+    where: {
+      agreementId: id,
+      state: { not: "CANCELLED" },
+    },
+  });
+  const alreadyBooked = existingBookings.reduce((sum, booking) => sum + booking.rooms, 0);
+  if (totalRooms < alreadyBooked) {
+    redirect("/contracts?type=error&message=contract_reduce_below_booked");
   }
 
   try {
@@ -127,6 +142,18 @@ async function cancelContract(formData: FormData) {
   "use server";
   const id = String(formData.get("id") ?? "");
   if (!id) redirect("/contracts?type=error&message=contract_update_failed");
+
+  const activeBookings = await prisma.booking.count({
+    where: {
+      agreementId: id,
+      state: {
+        in: ["CONFIRMED", "CHECKED_IN"],
+      },
+    },
+  });
+  if (activeBookings > 0) {
+    redirect("/contracts?type=error&message=contract_has_active_bookings");
+  }
 
   try {
     await prisma.agreement.update({
@@ -171,8 +198,8 @@ export default async function ContractsPage({ searchParams }: PageProps) {
       take: pageSize,
     }),
     prisma.agreement.count({ where: filter }),
-    prisma.client.findMany({ orderBy: { name: "asc" } }),
-    prisma.hotel.findMany({ orderBy: { name: "asc" } }),
+    prisma.client.findMany({ where: { isActive: true }, orderBy: { name: "asc" } }),
+    prisma.hotel.findMany({ where: { isActive: true }, orderBy: { name: "asc" } }),
     prisma.booking.findMany(),
     getNextAgreementNumber(),
   ]);
@@ -324,14 +351,24 @@ export default async function ContractsPage({ searchParams }: PageProps) {
                         <a href={isEditing ? createPageLink(page) : createPageLink(page, a.id)} className="btn-secondary">
                           {isEditing ? "إغلاق التعديل" : "تعديل"}
                         </a>
-                        <form action={cancelContract}>
-                          <input type="hidden" name="id" value={a.id} />
-                          <button className="btn-warning">إغلاق</button>
-                        </form>
-                        <form action={deleteContract}>
-                          <input type="hidden" name="id" value={a.id} />
-                          <button className="btn-danger">حذف</button>
-                        </form>
+                        <ActionConfirmForm
+                          action={cancelContract}
+                          buttonClassName="btn-warning"
+                          buttonLabel="إغلاق"
+                          modalTitle="إغلاق الاتفاقية"
+                          modalDescription="سيتم إغلاق الاتفاقية وإيقاف استخدامها في الحجوزات الجديدة."
+                          confirmLabel="تأكيد الإغلاق"
+                          hiddenFields={[{ name: "id", value: a.id }]}
+                        />
+                        <ActionConfirmForm
+                          action={deleteContract}
+                          buttonClassName="btn-danger"
+                          buttonLabel="أرشفة"
+                          modalTitle="أرشفة الاتفاقية"
+                          modalDescription="لن يتم حذف الاتفاقية من السجل، لكن سيتم إغلاقها وأرشفتها للحفاظ على التاريخ التشغيلي."
+                          confirmLabel="تأكيد الأرشفة"
+                          hiddenFields={[{ name: "id", value: a.id }]}
+                        />
                       </div>
                     </td>
                 </tr>,

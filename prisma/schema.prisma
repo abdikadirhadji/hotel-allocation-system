@@ -35,6 +35,7 @@ model Client {
   id         String      @id @default(cuid())
   name       String      @unique
   country    String?
+  isActive   Boolean     @default(true)
   createdAt  DateTime    @default(now())
   agreements Agreement[]
   bookings   Booking[]
@@ -44,6 +45,7 @@ model Hotel {
   id         String      @id @default(cuid())
   name       String      @unique
   city       String?
+  isActive   Boolean     @default(true)
   createdAt  DateTime    @default(now())
   agreements Agreement[]
   bookings   Booking[]

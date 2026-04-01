@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ActionConfirmForm } from "@/components/ActionConfirmForm";
 import { prisma } from "@/lib/prisma";
 import { getFlashMessage } from "@/lib/flash";
 import { getRemainingBadgeClass, getRemainingLabel } from "@/lib/status";
@@ -32,7 +33,10 @@ async function deleteClient(formData: FormData) {
   const id = String(formData.get("id") ?? "");
   if (!id) redirect("/clients?type=error&message=client_delete_failed");
   try {
-    await prisma.client.delete({ where: { id } });
+    await prisma.client.update({
+      where: { id },
+      data: { isActive: false },
+    });
   } catch {
     redirect("/clients?type=error&message=client_delete_failed");
   }
@@ -125,6 +129,7 @@ export default async function ClientsPage({ searchParams }: PageProps) {
             <th>المتبقي من الفترات</th>
             <th>نسبة الاستهلاك</th>
             <th>الحالة</th>
+            <th>التفعيل</th>
             <th>تاريخ الإنشاء</th>
             <th>إجراءات</th>
           </tr>
@@ -144,16 +149,26 @@ export default async function ClientsPage({ searchParams }: PageProps) {
                   {getRemainingLabel(clientStats.get(client.id)?.remaining ?? 0)}
                 </span>
               </td>
+              <td>
+                <span className={client.isActive ? "badge-success" : "badge-warning"}>
+                  {client.isActive ? "نشط" : "مؤرشف"}
+                </span>
+              </td>
               <td>{client.createdAt.toISOString().slice(0, 10)}</td>
               <td>
                 <div className="flex flex-wrap justify-center gap-2">
                   <Link href={`/clients/${client.id}`} className="btn-secondary">
                     التفاصيل
                   </Link>
-                  <form action={deleteClient}>
-                    <input type="hidden" name="id" value={client.id} />
-                    <button className="btn-danger">حذف</button>
-                  </form>
+                  <ActionConfirmForm
+                    action={deleteClient}
+                    buttonClassName="btn-danger"
+                    buttonLabel="أرشفة"
+                    modalTitle="أرشفة العميل"
+                    modalDescription="سيتم إخفاء هذا العميل من الاستخدام التشغيلي الجديد مع الاحتفاظ بالسجل السابق."
+                    confirmLabel="تأكيد الأرشفة"
+                    hiddenFields={[{ name: "id", value: client.id }]}
+                  />
                 </div>
               </td>
             </tr>

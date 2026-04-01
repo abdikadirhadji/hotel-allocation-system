@@ -12,6 +12,7 @@ const navItems = [
   { href: "/contracts", label: "الاتفاقيات" },
   { href: "/clients", label: "العملاء" },
   { href: "/hotels", label: "الفنادق" },
+  { href: "/account", label: "حسابي" },
 ];
 
 type AppShellProps = {

@@ -1,4 +1,6 @@
 import { prisma } from "@/lib/prisma";
+import { ActionConfirmForm } from "@/components/ActionConfirmForm";
+import { validateAgreementForBooking } from "@/lib/booking-validation";
 import { getFlashMessage } from "@/lib/flash";
 import { getBookingStateLabel } from "@/lib/labels";
 import { getNextBookingNumber } from "@/lib/numbering";
@@ -54,6 +56,7 @@ async function createBooking(formData: FormData) {
   }
 
   if (contract) {
+    validateAgreementForBooking(contract, clientId, hotelId, checkInDate, checkOutDate);
     const agreementBookings = await prisma.booking.findMany({
       where: {
         agreementId: contract.id,
@@ -94,7 +97,10 @@ async function deleteBooking(formData: FormData) {
   const id = String(formData.get("id") ?? "");
   if (!id) redirect("/bookings?type=error&message=booking_delete_failed");
   try {
-    await prisma.booking.delete({ where: { id } });
+    await prisma.booking.update({
+      where: { id },
+      data: { state: "CANCELLED" },
+    });
   } catch {
     redirect("/bookings?type=error&message=booking_delete_failed");
   }
@@ -140,6 +146,7 @@ async function updateBooking(formData: FormData) {
     redirect("/bookings?type=error&message=booking_update_failed");
   }
 
+  validateAgreementForBooking(contract, clientId, hotelId, checkInDate, checkOutDate);
   const agreementBookings = await prisma.booking.findMany({
     where: {
       agreementId: contract.id,
@@ -228,9 +235,9 @@ export default async function BookingsPage({ searchParams }: PageProps) {
       take: pageSize,
     }),
     prisma.booking.count({ where: filter }),
-    prisma.client.findMany({ orderBy: { name: "asc" } }),
-    prisma.hotel.findMany({ orderBy: { name: "asc" } }),
-    prisma.agreement.findMany({ orderBy: { createdAt: "desc" } }),
+    prisma.client.findMany({ where: { isActive: true }, orderBy: { name: "asc" } }),
+    prisma.hotel.findMany({ where: { isActive: true }, orderBy: { name: "asc" } }),
+    prisma.agreement.findMany({ where: { status: "ACTIVE" }, orderBy: { createdAt: "desc" } }),
     getNextBookingNumber(),
     prisma.booking.findMany({
       where: { state: { not: "CANCELLED" } },
@@ -399,14 +406,24 @@ export default async function BookingsPage({ searchParams }: PageProps) {
                         <a href={isEditing ? createPageLink(page) : createPageLink(page, b.id)} className="btn-secondary">
                           {isEditing ? "إغلاق التعديل" : "تعديل"}
                         </a>
-                        <form action={cancelBooking}>
-                          <input type="hidden" name="id" value={b.id} />
-                          <button className="btn-warning">إلغاء</button>
-                        </form>
-                        <form action={deleteBooking}>
-                          <input type="hidden" name="id" value={b.id} />
-                          <button className="btn-danger">حذف</button>
-                        </form>
+                        <ActionConfirmForm
+                          action={cancelBooking}
+                          buttonClassName="btn-warning"
+                          buttonLabel="إلغاء"
+                          modalTitle="إلغاء الحجز"
+                          modalDescription="سيتم تحويل هذا الحجز إلى حالة ملغي مع الاحتفاظ بسجله للرجوع إليه لاحقا."
+                          confirmLabel="تأكيد الإلغاء"
+                          hiddenFields={[{ name: "id", value: b.id }]}
+                        />
+                        <ActionConfirmForm
+                          action={deleteBooking}
+                          buttonClassName="btn-danger"
+                          buttonLabel="أرشفة"
+                          modalTitle="أرشفة الحجز"
+                          modalDescription="لن يتم حذف الحجز من السجل، بل سيتم إلغاؤه وأرشفته حفاظا على التاريخ التشغيلي."
+                          confirmLabel="تأكيد الأرشفة"
+                          hiddenFields={[{ name: "id", value: b.id }]}
+                        />
                       </div>
                     </td>
                 </tr>,

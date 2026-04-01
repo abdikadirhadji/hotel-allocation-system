@@ -1,6 +1,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
+import { ActionConfirmForm } from "@/components/ActionConfirmForm";
 import { prisma } from "@/lib/prisma";
 import { hashPassword, isStrongPassword } from "@/lib/password";
 import { requireSuperAdmin } from "@/lib/auth-guard";
@@ -169,16 +170,25 @@ export default async function AdminUsersPage({ searchParams }: PageProps) {
                 <td>{admin.lastLoginAt ? admin.lastLoginAt.toISOString().slice(0, 16).replace("T", " ") : "-"}</td>
                 <td>{admin.createdAt.toISOString().slice(0, 10)}</td>
                 <td>
-                  <form action={toggleAdminStatus} className="flex justify-center">
-                    <input type="hidden" name="id" value={admin.id} />
-                    <input type="hidden" name="isActive" value={String(admin.isActive)} />
-                    <button
-                      className={admin.isActive ? "btn-warning" : "btn-secondary"}
+                  <div className="flex justify-center">
+                    <ActionConfirmForm
+                      action={toggleAdminStatus}
+                      buttonClassName={admin.isActive ? "btn-warning" : "btn-secondary"}
+                      buttonLabel={admin.isActive ? "تعطيل" : "تفعيل"}
+                      modalTitle={admin.isActive ? "تعطيل المشرف" : "تفعيل المشرف"}
+                      modalDescription={
+                        admin.isActive
+                          ? "سيتم تعطيل هذا المشرف ومنعه من تسجيل الدخول حتى تتم إعادة تفعيله."
+                          : "سيتم تفعيل هذا المشرف والسماح له بتسجيل الدخول من جديد."
+                      }
+                      confirmLabel={admin.isActive ? "تأكيد التعطيل" : "تأكيد التفعيل"}
+                      hiddenFields={[
+                        { name: "id", value: admin.id },
+                        { name: "isActive", value: String(admin.isActive) },
+                      ]}
                       disabled={session.user.id === admin.id}
-                    >
-                      {admin.isActive ? "تعطيل" : "تفعيل"}
-                    </button>
-                  </form>
+                    />
+                  </div>
                 </td>
                 <td>
                   <form action={resetAdminPassword} className="flex flex-col gap-2">

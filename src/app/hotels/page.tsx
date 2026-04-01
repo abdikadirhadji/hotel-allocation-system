@@ -1,3 +1,4 @@
+import { ActionConfirmForm } from "@/components/ActionConfirmForm";
 import { prisma } from "@/lib/prisma";
 import { getFlashMessage } from "@/lib/flash";
 import { revalidatePath } from "next/cache";
@@ -29,7 +30,10 @@ async function deleteHotel(formData: FormData) {
   const id = String(formData.get("id") ?? "");
   if (!id) redirect("/hotels?type=error&message=hotel_delete_failed");
   try {
-    await prisma.hotel.delete({ where: { id } });
+    await prisma.hotel.update({
+      where: { id },
+      data: { isActive: false },
+    });
   } catch {
     redirect("/hotels?type=error&message=hotel_delete_failed");
   }
@@ -67,6 +71,7 @@ export default async function HotelsPage({ searchParams }: PageProps) {
           <tr>
             <th>اسم الفندق</th>
             <th>المدينة</th>
+            <th>الحالة</th>
             <th>تاريخ الإنشاء</th>
             <th>إجراءات</th>
           </tr>
@@ -76,12 +81,22 @@ export default async function HotelsPage({ searchParams }: PageProps) {
             <tr key={hotel.id}>
               <td>{hotel.name}</td>
               <td>{hotel.city ?? "-"}</td>
+              <td>
+                <span className={hotel.isActive ? "badge-success" : "badge-warning"}>
+                  {hotel.isActive ? "نشط" : "مؤرشف"}
+                </span>
+              </td>
               <td>{hotel.createdAt.toISOString().slice(0, 10)}</td>
               <td>
-                <form action={deleteHotel}>
-                  <input type="hidden" name="id" value={hotel.id} />
-                  <button className="btn-danger">حذف</button>
-                </form>
+                <ActionConfirmForm
+                  action={deleteHotel}
+                  buttonClassName="btn-danger"
+                  buttonLabel="أرشفة"
+                  modalTitle="أرشفة الفندق"
+                  modalDescription="سيبقى الفندق محفوظا في السجلات السابقة ولكن لن يستخدم في الإدخال الجديد."
+                  confirmLabel="تأكيد الأرشفة"
+                  hiddenFields={[{ name: "id", value: hotel.id }]}
+                />
               </td>
             </tr>
           ))}
