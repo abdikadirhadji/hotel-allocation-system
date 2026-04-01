@@ -1,0 +1,93 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum BookingState {
+  CONFIRMED
+  CHECKED_IN
+  CHECKED_OUT
+  CANCELLED
+}
+
+enum AdminRole {
+  SUPER_ADMIN
+  ADMIN
+}
+
+model AdminUser {
+  id           String    @id @default(cuid())
+  name         String
+  email        String    @unique
+  passwordHash String
+  role         AdminRole @default(ADMIN)
+  isActive     Boolean   @default(true)
+  lastLoginAt  DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+}
+
+model Client {
+  id         String      @id @default(cuid())
+  name       String      @unique
+  country    String?
+  createdAt  DateTime    @default(now())
+  agreements Agreement[]
+  bookings   Booking[]
+}
+
+model Hotel {
+  id         String      @id @default(cuid())
+  name       String      @unique
+  city       String?
+  createdAt  DateTime    @default(now())
+  agreements Agreement[]
+  bookings   Booking[]
+}
+
+model Agreement {
+  id          String    @id @default(cuid())
+  contractNo  String    @unique
+  clientId    String
+  hotelId     String
+  totalRooms  Int
+  availableRooms Int?
+  status      String    @default("ACTIVE")
+  allowOverbooking Boolean @default(false)
+  notes       String?
+  startDate   DateTime
+  endDate     DateTime
+  createdAt   DateTime  @default(now())
+  client      Client    @relation(fields: [clientId], references: [id], onDelete: Restrict)
+  hotel       Hotel     @relation(fields: [hotelId], references: [id], onDelete: Restrict)
+  bookings    Booking[]
+
+  @@index([clientId, startDate, endDate])
+  @@index([hotelId, startDate, endDate])
+}
+
+model Booking {
+  id           String    @id @default(cuid())
+  sn           Int       @default(autoincrement())
+  bookingNo    String    @unique
+  agreementId  String?
+  clientId     String
+  hotelId      String
+  companyName  String?
+  state        BookingState @default(CONFIRMED)
+  checkInDate  DateTime
+  checkOutDate DateTime
+  rooms        Int
+  createdAt    DateTime  @default(now())
+  agreement    Agreement? @relation(fields: [agreementId], references: [id], onDelete: SetNull)
+  client       Client     @relation(fields: [clientId], references: [id], onDelete: Restrict)
+  hotel        Hotel      @relation(fields: [hotelId], references: [id], onDelete: Restrict)
+
+  @@index([clientId, checkInDate, checkOutDate])
+  @@index([hotelId, checkInDate, checkOutDate])
+  @@unique([sn])
+}
